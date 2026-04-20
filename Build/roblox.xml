@@ -1,0 +1,349 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Module>
+<ModulePrefs title="classroom" />
+<Content type="html"><![CDATA[
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, minimal-ui, shrink-to-fit=no"/>
+<title>classroom.google.com</title>
+<style>
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html,body { width:100%; height:100%; overflow:hidden; background:#1a1a2e; font-family:sans-serif; -webkit-user-select:none; user-select:none; }
+  #unity-container { position:fixed; inset:0; }
+  #unity-canvas    { width:100%; height:100%; display:block; }
+  #loading-cover   { position:fixed; inset:0; z-index:20; background:linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%); display:flex; align-items:center; justify-content:center; flex-direction:column; gap:18px; }
+  .gd-logo  { font-size:28px; font-weight:900; letter-spacing:2px; color:#00d4ff; text-shadow:0 0 20px #00d4ff88; text-transform:uppercase; }
+  .gd-sub   { font-size:14px; color:#88ccff; letter-spacing:4px; margin-top:-12px; }
+  #bar-wrap { width:320px; height:10px; background:#ffffff22; border-radius:5px; overflow:hidden; display:none; }
+  #bar-fill { height:100%; width:0%; background:linear-gradient(90deg,#00d4ff,#0080ff); border-radius:5px; transition:width 0.15s; }
+  #load-info{ font-size:12px; color:#668899; min-height:16px; }
+  #play-btn { display:none; padding:12px 40px; font-size:16px; font-weight:bold; border:none; border-radius:30px; cursor:pointer; background:linear-gradient(135deg,#00d4ff,#0060cc); color:#fff; letter-spacing:1px; box-shadow:0 4px 20px #00d4ff44; transition:transform .15s,box-shadow .15s; }
+  #play-btn:hover  { transform:scale(1.05); }
+  #play-btn:active { transform:scale(0.97); }
+</style>
+</head>
+<body>
+
+<div id="unity-container">
+  <canvas id="unity-canvas" tabindex="-1"></canvas>
+</div>
+<div id="loading-cover">
+  <div class="gd-logo"> Ge0metry</div>
+  <div class="gd-sub">SubZer0</div>
+  <div id="bar-wrap"><div id="bar-fill"></div></div>
+  <div id="load-info">G+...</div>
+  <button id="play-btn" onclick="hideCover()">▶ PLAY</button>
+</div>
+
+<script>
+/* ╔══════════════════════════════════════════════════════════╗
+   ║  CONFIG — sadece bu bolumu guncelleyin                   ║
+   ╚══════════════════════════════════════════════════════════╝ */
+
+/* Build dosyalari CDN (parcalar dahil) */
+const BUILD_CDN = "https://cdn.jsdelivr.net/gh/gulamen/s77zz77google@main/Build";
+
+/* TXT dosyalari — simdilik null (alttaki TXT_CONTENTS kullanilir)
+   CDN'e yukleyince:  const TXT_CDN = "https://cdn.jsdelivr.net/gh/KULLANICI/REPO@main/";
+   o zaman alttaki TXT_CONTENTS kullanilmaz, CDN'den cekilir. */
+const TXT_CDN = null;
+
+/* TXT dosya icerikleri (TXT_CDN = null iken kullanilir) */
+const TXT_CONTENTS = {
+    'game.txt':    '8',
+    'setting.txt': 'U2FsdGVkX19YnFQZoiz4A00xYWNqRWhNRDlSbEpiY25Hamd6OHVMeXk5SGxtZGtoVjM4ZFdieDgraHhBdG0rMkpzdFAyd0VndWRkVWRDWVBxT2E5ODB4QzljOWZ1RFEwTmNiODN6QTRmZXQ5NWVoT3NqdlZFd2tONkNOa0FmdUlyTmdvcXdxc1NiamU5enZuRHY3S0ZyVTRHTXZVb0Vtc080QlN4K08rM0oxc3F0MEcyRStuUGZDVVZyRT0='
+};
+
+/* Build dosya parcalari */
+const BUILD_FILES = {
+    loader:    BUILD_CDN + "/devamke.loader.js",
+    framework: BUILD_CDN + "/nah.framework.js",
+    data: { name: "classroom-google.data", parts: 4 },
+    wasm: { name: "classroom-google-2.wasm", parts: 4 },
+};
+
+/* ╔══════════════════════════════════════════════════════════╗
+   ║  BURADAN ASAGI DOKUNMAYIN                                ║
+   ╚══════════════════════════════════════════════════════════╝ */
+
+/* window.originalFolder — framework icindeki _GetFolder() bunu okur */
+window.originalFolder = '.';  /* nokta: GetFolder() + "/" + "game.txt" = "./game.txt" */
+
+/* Fetch interceptor — TXT dosyalari icin */
+(function () {
+    const _orig = window.fetch;
+    const TXT_KEYS = Object.keys(TXT_CONTENTS);  /* ["game.txt", "setting.txt"] */
+
+    window.fetch = function (input, init) {
+        const url = (typeof input === 'string') ? input
+                    : (input && input.url) ? input.url : String(input);
+
+        const matchedKey = TXT_KEYS.find(k => url.includes(k));
+
+        if (matchedKey) {
+            if (TXT_CDN) {
+                /* CDN varsa oradan cek */
+                const cdnUrl = TXT_CDN.replace(/\/$/, '') + '/' + matchedKey;
+                console.log('[TXT] CDN yonlendirme:', matchedKey, '→', cdnUrl);
+                return _orig.call(this, cdnUrl, init);
+            }
+            /* Yoksa yerlesik icerik don */
+            console.log('[TXT] Yerlesik icerik:', matchedKey);
+            return Promise.resolve(new Response(TXT_CONTENTS[matchedKey], {
+                status: 200, statusText: 'OK',
+                headers: new Headers({ 'Content-Type': 'text/plain' })
+            }));
+        }
+        return _orig.apply(this, arguments);
+    };
+})();
+
+/* ────────────────────── UI ────────────────────── */
+const canvas   = document.querySelector("#unity-canvas");
+const cover    = document.querySelector("#loading-cover");
+const barWrap  = document.querySelector("#bar-wrap");
+const barFill  = document.querySelector("#bar-fill");
+const loadInfo = document.querySelector("#load-info");
+const playBtn  = document.querySelector("#play-btn");
+
+function hideCover() { cover.style.display = "none"; canvas.focus(); }
+function setBar(p)   { barFill.style.width = p + "%"; }
+function setInfo(m)  { loadInfo.textContent = m; }
+
+document.addEventListener('contextmenu', e => e.preventDefault());
+window.addEventListener('pointerdown', () => canvas.focus());
+window.addEventListener('touchstart',  () => canvas.focus());
+
+/* ──────────────── PART YUKLEME ──────────────── */
+async function fetchParts(fileInfo) {
+    const parts = [];
+    for (let i = 0; i < fileInfo.parts; i++) {
+        setInfo(`${fileInfo.name} (${i + 1}/${fileInfo.parts}) indiriliyor...`);
+        const r = await fetch(`${BUILD_CDN}/${fileInfo.name}.part${i}`);
+        if (!r.ok) throw new Error(`${fileInfo.name}.part${i}: ${r.status}`);
+        parts.push(new Uint8Array(await r.arrayBuffer()));
+    }
+    const total  = parts.reduce((s, p) => s + p.length, 0);
+    const merged = new Uint8Array(total);
+    let off = 0;
+    for (const p of parts) { merged.set(p, off); off += p.length; }
+    const mime = fileInfo.name.endsWith('.wasm') ? 'application/wasm' : 'application/octet-stream';
+    return URL.createObjectURL(new Blob([merged], { type: mime }));
+}
+
+/* ──────────────── ANA AKIS ──────────────── */
+(async function () {
+    try {
+        barWrap.style.display = "";
+        setBar(0);
+
+        const dataUrl = await fetchParts(BUILD_FILES.data);
+        setBar(40);
+
+        const wasmUrl = await fetchParts(BUILD_FILES.wasm);
+        setBar(70);
+
+        const config = {
+            dataUrl:            dataUrl,
+            frameworkUrl:       BUILD_FILES.framework,
+            codeUrl:            wasmUrl,
+            streamingAssetsUrl: "https://cdn.jsdelivr.net/gh/gulamen/s77zz77google@main/StreamingAssets",
+            companyName:        "zalman",
+            productName:        "zalman",
+            productVersion:     "1.0.1",
+        };
+
+        setInfo("Yukleniyor...");
+        await new Promise((res, rej) => {
+            const s = document.createElement("script");
+            s.src     = BUILD_FILES.loader;
+            s.onload  = res;
+            s.onerror = () => rej(new Error("Loader yuklenemedi"));
+            document.body.appendChild(s);
+        });
+        setBar(75);
+
+        const inst = await createUnityInstance(canvas, config, (p) => {
+            setInfo("");
+            setBar(75 + Math.round(p * 25));
+        });
+
+        window.unityInstance = inst;
+        setBar(100);
+        playBtn.style.display = "block";
+
+    } catch (err) {
+        console.error(err);
+        setInfo("Hata: " + err.message);
+    }
+})();
+</script>
+<!-- Sticky Bottom Center Ad (728x90) with Smooth Slide-Out and Reappearance -->
+<style>
+  /* Container: Bottom center, fixed, with overflow hidden */
+  #ad-container {
+    position: fixed;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(728px, calc(100% - 20px)); /* 728px, 10px margin on mobile */
+    height: 90px;
+    background: rgba(0, 0, 0, 0.90);
+    display: none;
+    z-index: 99999;
+    border-radius: 0; /* Sharp corners */
+    overflow: hidden;
+    box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.45);
+    box-sizing: border-box;
+    transition: transform 0.5s ease-in-out; /* Smooth slide-in/out animation */
+  }
+
+  /* Slide-out animation */
+  #ad-container.hidden {
+    transform: translate(-50%, 100%); /* Slide down out of view */
+  }
+
+  #ad-iframe {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 745px; /* Updated width */
+    height: 90px; /* Updated height */
+    border: 0;
+    display: block;
+    overflow: hidden;
+    pointer-events: auto;
+    box-sizing: content-box;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  #ad-iframe::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+
+  /* Close button with arrow */
+  #close-ad {
+    position: absolute;
+    top: 6px;
+    right: 8px;
+    background: #ff4d4d;
+    color: #fff;
+    border: none;
+    padding: 5px 9px;
+    font-size: 13px;
+    border-radius: 4px;
+    cursor: not-allowed;
+    opacity: 0.72;
+    z-index: 100000;
+    display: flex;
+    align-items: center;
+  }
+  #close-ad.enabled {
+    cursor: pointer;
+    opacity: 1;
+  }
+  #close-ad::before {
+    content: '↓'; /* Down arrow for bottom ad */
+    margin-right: 4px;
+  }
+
+  /* Right mask for scrollbar */
+  #ad-right-mask {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 12px;
+    height: 100%;
+    pointer-events: none;
+    background: linear-gradient(to right, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.9));
+    z-index: 99999;
+  }
+
+  /* Mobile adjustments */
+  @media (max-width: 440px) {
+    #ad-container {
+      width: calc(100% - 12px);
+      left: 50%;
+      transform: translateX(-50%);
+      border-radius: 0; /* Sharp corners on mobile */
+    }
+    #ad-iframe {
+      width: 728px;
+    }
+  }
+</style>
+
+<div id="ad-container" aria-hidden="true" role="dialog" aria-label="Advertisement">
+  <iframe
+    id="ad-iframe"
+    src="https://script.google.com/macros/s/AKfycbxLG5DHBe-sIbduDvwQZYJ3oaX_ha7rsvroprCFkQsnpZK_PEdipNia5ghxI_sdXYpv/exec"
+    width="768px"
+    height="95px"
+    scrolling="no"
+    frameborder="0"
+    sandbox="allow-scripts allow-popups allow-same-origin"
+  ></iframe>
+  <button id="close-ad" disabled>Close (12)</button>
+  <div id="ad-right-mask"></div>
+</div>
+
+<script>
+  (function () {
+    const showDelay = 2000; // 2 seconds delay before first show
+    const countdownStart = 12; // 12 seconds countdown
+    const reappearDelay = 150000; // 25 seconds before reappearance
+    const adContainer = document.getElementById('ad-container');
+    const closeBtn = document.getElementById('close-ad');
+
+    function showAd() {
+      // Show ad with smooth slide-in
+      adContainer.style.display = 'block';
+      adContainer.classList.remove('hidden');
+      adContainer.setAttribute('aria-hidden', 'false');
+
+      // Start countdown
+      let timeLeft = countdownStart;
+      closeBtn.textContent = `Close (${timeLeft})`;
+      closeBtn.disabled = true;
+      closeBtn.classList.remove('enabled');
+
+      const t = setInterval(() => {
+        timeLeft--;
+        if (timeLeft > 0) {
+          closeBtn.textContent = `Close (${timeLeft})`;
+        } else {
+          clearInterval(t);
+          closeBtn.disabled = false;
+          closeBtn.classList.add('enabled');
+          closeBtn.textContent = 'Close ↓';
+        }
+      }, 1000);
+    }
+
+    // Initial ad show
+    setTimeout(showAd, showDelay);
+
+    // Close with animation and schedule reappearance
+    closeBtn.addEventListener('click', () => {
+      if (closeBtn.disabled) return;
+      adContainer.classList.add('hidden');
+      adContainer.setAttribute('aria-hidden', 'true');
+      // Schedule reappearance without removing or reloading iframe
+      setTimeout(showAd, reappearDelay);
+    });
+  })();
+</script>
+</body>
+</html>
+
+]]></Content>
+</Module>
